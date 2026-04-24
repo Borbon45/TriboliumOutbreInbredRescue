@@ -8,9 +8,14 @@ library(multcomp)
 library(emmeans)
 library(glmmTMB)
 library(patchwork)
-
+setwd("~/OneDrive - University of East Anglia/Experiment 5 - Genomics")
+setwd("D:/OneDrive - University of East Anglia/Experiment 5 - Genomics")
+#all
 allsnp<-read.table("psc_snps_stats.txt")
 siftsnp<-read.table("psc_output_confident.txt")
+#only autosomes
+#allsnp<-read.table("psc_autosomes_stats.txt")
+#siftsnp<-read.table("psc_autosomes_SIFT.txt")
 
 merged_snps <- allsnp %>%
   inner_join(siftsnp, by = "V3")
@@ -207,12 +212,12 @@ pairwise_comparisons2 <- pairs(emm2)
 summary(pairwise_comparisons2)
 
 Prophom<-Prophom + geom_signif(
-  comparisons = list(c("KSS","ISO"),c("Outbred", "Inbred"), c("Outbred", "Control")),
-  annotations = c("p < 0.001", "p < 0.001","p < 0.001"),
-  y_position = c(0.2, 0.24, 0.2), 
+  comparisons = list(c("Outbred", "Inbred"), c("Outbred", "Control"),c("Control","Inbred")),
+  annotations = c("p < 0.001","p < 0.001", "N.S"),
+  y_position = c(0.24, 0.2, 0.35), 
   tip_length = -0.03,
   textsize = 5,
-  vjust = 1
+  vjust = 0.5
 ) 
 
 Prophom
@@ -243,8 +248,8 @@ Countdel <- merged_snps %>%
     legend.key.size = unit(1,"cm"),
     legend.position = "right"
   )+
-  ggplot2::annotate(geom = "text",x=1.5,y=2730,label="Stock",color="black",size=8)+
-  ggplot2::annotate(geom = "text",x=4.5,y=2730,label="Experimental",color="black",size=8)
+  ggplot2::annotate(geom = "text",x=1.5,y=3200,label="Stock",color="black",size=8)+
+  ggplot2::annotate(geom = "text",x=4.5,y=3200,label="Experimental",color="black",size=8)
 
 model_count<-glmmTMB(Total_Del_SNPs~Treatment+indvcover+(1|population),family=nbinom1, data = merged_snps)
 summary(model_count)
@@ -258,9 +263,9 @@ pairwise_comparisons3 <- pairs(emm3)
 summary(pairwise_comparisons3)
 
 Countdel<-Countdel + geom_signif(
-  comparisons = list(c("KSS", "ISO"),c("Outbred", "Inbred"), c("Outbred", "Control")), 
-  annotations = c("p < 0.001", "p < 0.001","p < 0.001"), 
-  y_position = c(2750, 2750, 2800), 
+  comparisons = list(c("Outbred", "Inbred"), c("Outbred", "Control"),c("Control","Inbred")), 
+  annotations = c("p < 0.001","p < 0.001","N.S"), 
+  y_position = c(2900, 3000, 2800), 
   tip_length = 0.03,
   textsize = 5,
   vjust = 0
@@ -310,13 +315,13 @@ Countdel_p <- merged_snps_p %>%
     legend.key.size = unit(1,"cm"),
     legend.position = "right"
   )+
-  ggplot2::annotate(geom = "text",x=1.5,y=2730,label="Stock",color="black",size=8)+
-  ggplot2::annotate(geom = "text",x=4.5,y=2730,label="Experimental",color="black",size=8)
+  ggplot2::annotate(geom = "text",x=1.5,y=3200,label="Stock",color="black",size=8)+
+  ggplot2::annotate(geom = "text",x=4.5,y=3200,label="Experimental",color="black",size=8)
 
 Countdel_p<-Countdel_p + geom_signif(
-  comparisons = list(c("KSS", "ISO"),c("Outbred", "Inbred"), c("Outbred", "Control")), 
-  annotations = c("p < 0.001", "p < 0.001","p < 0.001"), 
-  y_position = c(2750, 2750, 2800), 
+  comparisons = list(c("Outbred", "Inbred"), c("Outbred", "Control"),c("Control","Inbred")), 
+  annotations = c("p < 0.001","p < 0.001","N.S"), 
+  y_position = c(2900, 3000, 2800), 
   tip_length = 0.03,
   textsize = 5,
   vjust = 0
@@ -355,12 +360,12 @@ Prophom_p <- merged_snps_p %>%
   ggplot2::annotate(geom = "text",x=4.5,y=0.75,label="Experimental",color="black",size=8)
 
 Prophom_p<-Prophom_p + geom_signif(
-  comparisons = list(c("KSS","ISO"),c("Outbred", "Inbred"), c("Outbred", "Control")),
-  annotations = c("p < 0.001", "p < 0.001","p < 0.001"),
-  y_position = c(0.2, 0.24, 0.2), 
+  comparisons = list(c("Outbred", "Inbred"), c("Outbred", "Control"),c("Control","Inbred")),
+  annotations = c("p < 0.001","p < 0.001", "N.S"),
+  y_position = c(0.24, 0.2, 0.35), 
   tip_length = -0.03,
   textsize = 5,
-  vjust = 1
+  vjust = 0.5
 ) 
 
 Prophom_p <- Prophom_p +
