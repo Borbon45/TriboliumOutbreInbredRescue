@@ -144,10 +144,10 @@ F_Inbred_sig <- grhet %>%
   ggplot2::annotate(geom = "text",x=4,y=0.65,label="Experimental",color="black",size=8)
 
 plot1<-F_Inbred_sig + geom_signif(
-  comparisons = list(c("KSS","ISO"),c("Outbred", "Inbred"),c("Outbred","Control")), # Groups to compare
-  annotations = c("p < 0.001","p < 0.001", "p < 0.001"),    # P-values or any text
-  y_position = c(-0.1,0.1,0),
+  comparisons = list(c("KSS","ISO"),c("Control","Inbred"),c("Outbred", "Inbred"),c("Outbred","Control")), # Groups to compare
+  annotations = c("p < 0.001","N.S","p < 0.001", "p < 0.001"),    # P-values or any text
+  y_position = c(-0.1,0.1,0,-0.1),
   tip_length = -0.03,                           # Length of the little vertical lines
   textsize = 6,
-  vjust = 0.5)  
+  vjust = 0.5)
 
