@@ -14,7 +14,6 @@ library(lme4)          # For running Linear Mixed-Effects Models (lmer)
 library(nlme)          # Alternative package for linear/nonlinear mixed effects
 library(multcomp)      # For simultaneous inference / multiple comparisons
 library(Rmisc)         # For general data summary tools
-library(googlesheets4) # For interacting with Google Sheets data (not actively used below)
 library(ggsignif)      # To easily add significance brackets/bars to ggplots
 library(gridExtra)     # To arrange multiple grid-based plots
 library(emmeans)       # For calculating Estimated Marginal Means and post-hoc tests
