@@ -14,8 +14,8 @@ IVO/
 
  Scripts/
   Fig 1B.R                      # R script to generate Figure 1B
-  Fig 2.R                       # R script to generate Figure 2 and Table S
-  Fig 3.R                       # R script to generate Figure 3
+  Fig 2.R                       # R script to generate Figure 2 and Table S2
+  Fig 3.R                       # R script to generate Figure 3 and Tables S3 and S4
   Fig S1.R                      # R script to generate Supplemental Figure S1
   Table1.R                      # R script to calculate values for Table 1
   het.sh                        # Bash script for heterozygosity analysis
