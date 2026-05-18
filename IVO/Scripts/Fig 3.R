@@ -1,64 +1,69 @@
-rm(list=ls()) 
-library(ggpubr)
-library(tidyverse)
-library(DHARMa)
-library(googlesheets4)
-library(Rmisc)
-library(multcomp)
-library(emmeans)
-library(glmmTMB)
-library(patchwork)
-setwd("~/OneDrive - University of East Anglia/Experiment 5 - Genomics")
-setwd("D:/OneDrive - University of East Anglia/Experiment 5 - Genomics")
-#all
-allsnp<-read.table("psc_snps_stats.txt")
-siftsnp<-read.table("psc_output_confident.txt")
-#only autosomes
-#allsnp<-read.table("psc_autosomes_stats.txt")
-#siftsnp<-read.table("psc_autosomes_SIFT.txt")
+# ==============================================================================
+# SECTION 1: ENVIRONMENT SETUP & DIRECTORY DEFINITION
+# ==============================================================================
 
+# Clear the R environment
+rm(list=ls()) 
+
+# Load packages for data Wrangling, GLMMs, Diagnostics, and Patchwork plotting
+library(ggpubr)
+library(tidyverse)     # Core data tools
+library(DHARMa)        # For assessing GLMM residual diagnostics (simulateResiduals)
+library(Rmisc)         # For general data summary tools
+library(multcomp)      # For simultaneous inference / multiple comparisons
+library(emmeans)       # Post-hoc pairwise evaluations
+library(glmmTMB)       # For Beta and Negative Binomial mixed models
+library(patchwork)     # To compile compound plots using syntax like '/' or '+'
+
+# ==============================================================================
+# SECTION 2: FILE INTAKE & INNER-JOIN MUTATION
+# ==============================================================================
+
+# Load baseline SNP descriptive files and functional annotation summary files (e.g., SIFT scores)
+allsnp <- read.table("psc_snps_stats.txt")
+siftsnp <- read.table("psc_output_confident.txt")
+
+# Merge dataframes by matching on column 3 (V3: Likely containing the baseline Sample Key)
 merged_snps <- allsnp %>%
   inner_join(siftsnp, by = "V3")
 
-merged_snps<-merged_snps%>%dplyr::select(-1,-2,-15,-16)
+# Strip redundant or unneeded metadata tracking columns
+merged_snps <- merged_snps %>% dplyr::select(-1, -2, -15, -16)
 
-merged_snps<-merged_snps%>%dplyr::rename(Sample = V3)
-merged_snps<-merged_snps%>%dplyr::rename(allRefHom = V4.x)
-merged_snps<-merged_snps%>%dplyr::rename(allAltHom = V5.x)
-merged_snps<-merged_snps%>%dplyr::rename(allHet = V6.x)
-merged_snps<-merged_snps%>%dplyr::rename(allTransitions = V7.x)
-merged_snps<-merged_snps%>%dplyr::rename(allTransversions = V8.x)
-merged_snps<-merged_snps%>%dplyr::rename(allIndels = V9.x)
-merged_snps<-merged_snps%>%dplyr::rename(allAverageDepth = V10.x)
-merged_snps<-merged_snps%>%dplyr::rename(allSingletons = V11.x)
-merged_snps<-merged_snps%>%dplyr::rename(allHapref = V12.x)
-merged_snps<-merged_snps%>%dplyr::rename(allHapalt = V13.x)
-merged_snps<-merged_snps%>%dplyr::rename(allMissing = V14.x)
-merged_snps<-merged_snps%>%dplyr::rename(delRefHom = V4.y)
-merged_snps<-merged_snps%>%dplyr::rename(delAltHom = V5.y)
-merged_snps<-merged_snps%>%dplyr::rename(delHet = V6.y)
-merged_snps<-merged_snps%>%dplyr::rename(delTransitions = V7.y)
-merged_snps<-merged_snps%>%dplyr::rename(delTransversions = V8.y)
-merged_snps<-merged_snps%>%dplyr::rename(delIndels = V9.y)
-merged_snps<-merged_snps%>%dplyr::rename(delAverageDepth = V10.y)
-merged_snps<-merged_snps%>%dplyr::rename(delSingletons = V11.y)
-merged_snps<-merged_snps%>%dplyr::rename(delHapref = V12.y)
-merged_snps<-merged_snps%>%dplyr::rename(delHapalt = V13.y)
-merged_snps<-merged_snps%>%dplyr::rename(delMissing = V14.y)
+# Provide clean, descriptive names replacing V3-V14 indexing defaults for clarity
+# Note: '.x' stems from the base allsnp dataframe, '.y' stems from the siftsnp file
+merged_snps <- merged_snps %>% dplyr::rename(
+  Sample = V3,
+  allRefHom = V4.x,         allAltHom = V5.x,         allHet = V6.x,
+  allTransitions = V7.x,    allTransversions = V8.x,  allIndels = V9.x,
+  allAverageDepth = V10.x,  allSingletons = V11.x,    allHapref = V12.x,
+  allHapalt = V13.x,        allMissing = V14.x,
+  
+  delRefHom = V4.y,         delAltHom = V5.y,         delHet = V6.y,
+  delTransitions = V7.y,    delTransversions = V8.y,  delIndels = V9.y,
+  delAverageDepth = V10.y,  delSingletons = V11.y,    delHapref = V12.y,
+  delHapalt = V13.y,        delMissing = V14.y
+)
 
-Treatment<- rep(NA, length(merged_snps$Sample))
-Treatment[grep("O", merged_snps$Sample)] <- "Outbred"
+# ==============================================================================
+# SECTION 3: REGEX TREATMENT, POPULATION TRACKING, & OUTLIER STRIPPING
+# ==============================================================================
+
+# Group rows into treatment clusters based on Sample string patterns
+Treatment <- rep(NA, length(merged_snps$Sample))
+Treatment[grep("O", merged_snps$Sample)]   <- "Outbred"
 Treatment[grep("ISO", merged_snps$Sample)] <- "ISO"
-Treatment[grep("L", merged_snps$Sample)] <- "Inbred"
-Treatment[grep("H", merged_snps$Sample)] <- "Inbred"
-Treatment[grep("C", merged_snps$Sample)] <- "Control"
+Treatment[grep("L", merged_snps$Sample)]   <- "Inbred"
+Treatment[grep("H", merged_snps$Sample)]   <- "Inbred"
+Treatment[grep("C", merged_snps$Sample)]   <- "Control"
 Treatment[grep("KSS", merged_snps$Sample)] <- "KSS"
-merged_snps$Treatment<-Treatment
+merged_snps$Treatment <- Treatment
 
-population<-rep(NA, length(merged_snps$Sample))
-population[grep("01C", merged_snps$Sample)] <- "01"
-population[grep("02H", merged_snps$Sample)] <- "02"
-population[grep("03O", merged_snps$Sample)] <- "03"
+# Map individuals back to their historical source population backgrounds
+population <- rep(NA, length(merged_snps$Sample))
+population[grep("01C", merged_snps$Sample)]   <- "01"
+population[grep("02H", merged_snps$Sample)]   <- "02"
+population[grep("03O", merged_snps$Sample)]   <- "03"
 population[grep("04", merged_snps$Sample)] <- "04"
 population[grep("05", merged_snps$Sample)] <- "05"
 population[grep("06", merged_snps$Sample)] <- "06"
@@ -104,7 +109,7 @@ population[grep("45", merged_snps$Sample)] <- "45"
 population[grep("46", merged_snps$Sample)] <- "46"
 population[grep("47", merged_snps$Sample)] <- "47"
 population[grep("48", merged_snps$Sample)] <- "48"
-population[grep("KSS", merged_snps$Sample)] <- "KSS"
+population[grep("KSS", merged_snps$Sample)]   <- "KSS"
 population[grep("01ISO", merged_snps$Sample)] <- "01ISO"
 population[grep("03ISO", merged_snps$Sample)] <- "03ISO"
 population[grep("05ISO", merged_snps$Sample)] <- "05ISO"
@@ -117,260 +122,174 @@ population[grep("16ISO", merged_snps$Sample)] <- "16ISO"
 population[grep("20ISO", merged_snps$Sample)] <- "20ISO"
 population[grep("21ISO", merged_snps$Sample)] <- "21ISO"
 population[grep("23ISO", merged_snps$Sample)] <- "23ISO"
-merged_snps$population<-population
+merged_snps$population <- population
 
-merged_snps<-merged_snps%>%
-  filter(!(Sample%in%c("10O03","11H02")))
-merged_snps<-merged_snps%>%
-  mutate(Sample=str_remove(Sample,"_.*"))
-#remove males
+# Drop low-quality/failed samples and strip tail trailing strings from sample entries
 merged_snps <- merged_snps %>%
+  filter(!(Sample %in% c("10O03", "11H02"))) %>%
+  mutate(Sample = str_remove(Sample, "_.*")) %>%
+  filter(!grepl("m", Sample)) # Purge males to restrict data exclusively to females
+
+# Load independent coverage/depth summary metadata
+coverage <- read.table("genetic_rescue_samplenames_bam_files.depth.av.sort") %>%
+  dplyr::rename(Sample = V1, indvcover = V2) %>%
+  filter(!(Sample %in% c("10O03", "11H02"))) %>%
   filter(!grepl("m", Sample))
 
-coverage<-read.table("genetic_rescue_samplenames_bam_files.depth.av.sort")
-coverage<-coverage%>%dplyr::rename(Sample = V1)
-coverage<-coverage%>%dplyr::rename(indvcover = V2)
-coverage<-coverage%>%
-  filter(!(Sample%in%c("10O03","11H02")))
-coverage <- coverage %>%
-  filter(!grepl("m", Sample))
+# Integrate individual sample coverage depths back into the primary dataframe
+merged_snps <- merged_snps %>%
+  inner_join(coverage, by = "Sample") %>%
+  mutate(Treatment = fct_relevel(Treatment, "KSS", "ISO", "Control", "Inbred", "Outbred"))
+
+# ==============================================================================
+# SECTION 4: GENOMIC FORMULA CONSTRAINTS
+# ==============================================================================
 
 merged_snps <- merged_snps %>%
-  inner_join(coverage, by = "Sample")
+  mutate(
+    Totalpositions = allAltHom + allHet + allRefHom, # Calculates every surveyed site
+    TotalSNPS      = allAltHom + allHet,             # Sums non-reference site variations
+    Total_Del_SNPs = delHet + delAltHom,             # Total variants structurally tagged as deleterious
+    Propdelsnps    = Total_Del_SNPs / TotalSNPS,     # Rate of variant load that is harmful
+    Prophomdelsnps = delAltHom / Total_Del_SNPs,     # Rate of variant load fixed to homozygosity
+    prophomdel     = delAltHom / Total_Del_SNPs      # Equivalent assignment duplicate
+  )
 
-merged_snps<-merged_snps %>%
-  mutate(Treatment=fct_relevel(Treatment,"KSS","ISO","Control","Inbred","Outbred"))
+# Palette variable setup
+selected_colours1 <- c("#1B9E77FF", "#D95F02FF", "#000000", "#0072B2", "#E69F00")
 
+# ==============================================================================
+# SECTION 5: ANALYSIS BLOCK 1 — HOMOZYGOUS DELETERIOUS RATIO (BETA GLMM)
+# ==============================================================================
 
-#all positions
-merged_snps<-merged_snps%>%
-  mutate(Totalpositions=allAltHom+allHet+allRefHom)
-#count total snps 
-merged_snps<-merged_snps%>%
-  mutate(TotalSNPS=allAltHom+allHet)
-#count deleterious SNPs (alt or het)
-merged_snps<-merged_snps%>%
-  mutate(Total_Del_SNPs=delHet+delAltHom)
-#proportion of snps that are deleterious
-merged_snps<-merged_snps%>%
-  mutate(Propdelsnps=Total_Del_SNPs/TotalSNPS)
-#proportion of snps that are hom
-merged_snps<-merged_snps%>%
-  mutate(Prophomdelsnps=delAltHom/Total_Del_SNPs)
-#what proportion of deleterious snps are alt hom
-merged_snps<-merged_snps%>%
-  mutate(prophomdel=delAltHom/Total_Del_SNPs)
-
-selected_colours1<-c("#1B9E77FF","#D95F02FF","#000000","#0072B2","#E69F00")
-
+# Build base boxplot tracking the proportions
 Prophom <- merged_snps %>%
-  ggplot(aes(y = prophomdel, x = Treatment, fill = Treatment))+
-  geom_boxplot(alpha=0.8, outlier.shape=NA) +
-  scale_x_discrete(labels=c("KSS"="Outbred Stock","ISO"="Inbred Stock","Control"="No Rescue",
-                            "Inbred"="Inbred Rescue",
-                            "Outbred"="Outbred Rescue"))+
-  geom_jitter(width=0.1, alpha=0.6,show.legend = FALSE) +
-  scale_fill_manual(values=selected_colours1,
-                    labels = c("Outbred Stock", "Inbred Stock", "No Rescue",
-                               "Inbred Rescue", 
-                               "Outbred Rescue"))+
-  geom_vline(xintercept = 2.5,linetype="dashed")+
-  theme_classic()+
-  xlab("Treatment")+
-  ylab("Proportion of homozygous deleterious SNPs")+
-  theme(
-    plot.title = ggtext::element_markdown(face = "bold", size = 20),  # Apply markdown only to title
-    axis.title.x = element_text(face = "bold", size = 20),
-    axis.title.y = element_text(face = "bold", size = 20),            # Keep element_text for y-axis title
-    axis.text.x = element_text(face="bold",size = 16),
-    axis.text.y = element_text(face="bold",size=20),
-    legend.title = element_text(face = "bold", size = 20),
-    legend.text = element_text(face ="bold",size = 20),
-    legend.key.size = unit(1,"cm"),
-    legend.position = "right"
-  )+
-  ggplot2::annotate(geom = "text",x=1.5,y=0.75,label="Stock",color="black",size=8)+
-  ggplot2::annotate(geom = "text",x=4.5,y=0.75,label="Experimental",color="black",size=8)
+  ggplot(aes(y = prophomdel, x = Treatment, fill = Treatment)) +
+  geom_boxplot(alpha = 0.8, outlier.shape = NA) +
+  scale_x_discrete(labels = c("KSS" = "Outbred Stock", "ISO" = "Inbred Stock", "Control" = "No Rescue", "Inbred" = "Inbred Rescue", "Outbred" = "Outbred Rescue")) +
+  geom_jitter(width = 0.1, alpha = 0.6, show.legend = FALSE) +
+  scale_fill_manual(values = selected_colours1) +
+  geom_vline(xintercept = 2.5, linetype = "dashed") +
+  theme_classic() + xlab("Treatment") + ylab("Proportion of homozygous deleterious SNPs") +
+  theme(axis.title = element_text(face = "bold", size = 20), axis.text.x = element_text(face = "bold", size = 16), axis.text.y = element_text(face = "bold", size = 20), legend.position = "right") +
+  ggplot2::annotate(geom = "text", x = 1.5, y = 0.75, label = "Stock", color = "black", size = 8) +
+  ggplot2::annotate(geom = "text", x = 4.5, y = 0.75, label = "Experimental", color = "black", size = 8)
 
-
+# Fit Beta Generalized Linear Mixed Model (Ideal for continuous proportions bounded between 0 and 1)
 model_beta2 <- glmmTMB(
   prophomdel ~ Treatment + indvcover + (1 | population),
   data = merged_snps,
   family = beta_family(link = "logit")
 )
-
 summary(model_beta2)
-fitbeta2 <- simulateResiduals(fittedModel = model_beta2, plot = T)
 
-# Obtain estimated marginal means for Treatment
+# Diagnostic generation via DHARMa (Checks for overdispersion or severe deviations in residuals)
+fitbeta2 <- simulateResiduals(fittedModel = model_beta2, plot = TRUE)
+
+# Post-Hoc Marginal Evaluations
 emm2 <- emmeans(model_beta2, ~ Treatment)
-
-# Perform pairwise comparisons
 pairwise_comparisons2 <- pairs(emm2)
-
-# Display the results of pairwise comparisons
 summary(pairwise_comparisons2)
 
-Prophom<-Prophom + geom_signif(
-  comparisons = list(c("Outbred", "Inbred"), c("Outbred", "Control"),c("Control","Inbred")),
-  annotations = c("p < 0.001","p < 0.001", "N.S"),
-  y_position = c(0.24, 0.2, 0.35), 
-  tip_length = -0.03,
-  textsize = 5,
-  vjust = 0.5
-) 
+# Overlay p-value brackets onto raw metric visualization
+Prophom <- Prophom + geom_signif(
+  comparisons = list(c("Outbred", "Inbred"), c("Outbred", "Control"), c("Control", "Inbred")),
+  annotations = c("p < 0.001", "p < 0.001", "N.S"),
+  y_position = c(0.24, 0.2, 0.35), tip_length = -0.03, textsize = 5, vjust = 0.5
+)
 
-Prophom
+# ==============================================================================
+# SECTION 6: ANALYSIS BLOCK 2 — TOTAL DELETERIOUS COUNTS (NEGATIVE BINOMIAL)
+# ==============================================================================
 
+# Build base boxplot tracking total absolute counts
 Countdel <- merged_snps %>%
-  ggplot(aes(y = Total_Del_SNPs, x = Treatment, fill = Treatment))+
-  geom_boxplot(alpha=0.8, outlier.shape=NA) +
-  scale_x_discrete(labels=c("KSS"="Outbred Stock","ISO"="Inbred Stock","Control"="No Rescue",
-                            "Inbred"="Inbred Rescue",
-                            "Outbred"="Outbred Rescue"))+
-  geom_jitter(width=0.1, alpha=0.6,show.legend = FALSE) +
-  scale_fill_manual(values=selected_colours1,
-                    labels = c("Outbred Stock", "Inbred Stock", "No Rescue",
-                               "Inbred Rescue", 
-                               "Outbred Rescue"))+
-  geom_vline(xintercept = 2.5,linetype="dashed")+
-  theme_classic()+
-  xlab("Treatment")+
-  ylab("Count of deleterious SNPs")+
-  theme(
-    plot.title = ggtext::element_markdown(face = "bold", size = 20),  # Apply markdown only to title
-    axis.title.x = element_text(face = "bold", size = 20),
-    axis.title.y = element_text(face = "bold", size = 20),            # Keep element_text for y-axis title
-    axis.text.x = element_text(face="bold",size = 16),
-    axis.text.y = element_text(face="bold",size=20),
-    legend.title = element_text(face = "bold", size = 20),
-    legend.text = element_text(face ="bold",size = 20),
-    legend.key.size = unit(1,"cm"),
-    legend.position = "right"
-  )+
-  ggplot2::annotate(geom = "text",x=1.5,y=3200,label="Stock",color="black",size=8)+
-  ggplot2::annotate(geom = "text",x=4.5,y=3200,label="Experimental",color="black",size=8)
+  ggplot(aes(y = Total_Del_SNPs, x = Treatment, fill = Treatment)) +
+  geom_boxplot(alpha = 0.8, outlier.shape = NA) +
+  scale_x_discrete(labels = c("KSS" = "Outbred Stock", "ISO" = "Inbred Stock", "Control" = "No Rescue", "Inbred" = "Inbred Rescue", "Outbred" = "Outbred Rescue")) +
+  geom_jitter(width = 0.1, alpha = 0.6, show.legend = FALSE) +
+  scale_fill_manual(values = selected_colours1) +
+  geom_vline(xintercept = 2.5, linetype = "dashed") +
+  theme_classic() + xlab("Treatment") + ylab("Count of deleterious SNPs") +
+  ggplot2::annotate(geom = "text", x = 1.5, y = 3200, label = "Stock", color = "black", size = 8) +
+  ggplot2::annotate(geom = "text", x = 4.5, y = 3200, label = "Experimental", color = "black", size = 8)
 
-model_count<-glmmTMB(Total_Del_SNPs~Treatment+indvcover+(1|population),family=nbinom1, data = merged_snps)
+# Fit Count-Based GLMM (Negative Binomial family handles overdispersed count parameters)
+model_count <- glmmTMB(Total_Del_SNPs ~ Treatment + indvcover + (1 | population), family = nbinom1, data = merged_snps)
 summary(model_count)
-fitmodel_count <- simulateResiduals(fittedModel = model_count, plot = T)
+
+# Verify count residuals and dispersion levels
+fitmodel_count <- simulateResiduals(fittedModel = model_count, plot = TRUE)
 testDispersion(fitmodel_count)
-# Obtain estimated marginal means for Treatment
+
+# Pairwise comparisons
 emm3 <- emmeans(model_count, ~ Treatment)
-# Perform pairwise comparisons
 pairwise_comparisons3 <- pairs(emm3)
-# Display the results of pairwise comparisons
 summary(pairwise_comparisons3)
 
-Countdel<-Countdel + geom_signif(
-  comparisons = list(c("Outbred", "Inbred"), c("Outbred", "Control"),c("Control","Inbred")), 
-  annotations = c("p < 0.001","p < 0.001","N.S"), 
-  y_position = c(2900, 3000, 2800), 
-  tip_length = 0.03,
-  textsize = 5,
-  vjust = 0
-) 
-Countdel
+# Overlay p-value brackets onto raw count visualization
+Countdel <- Countdel + geom_signif(
+  comparisons = list(c("Outbred", "Inbred"), c("Outbred", "Control"), c("Control", "Inbred")),
+  annotations = c("p < 0.001", "p < 0.001", "N.S"),
+  y_position = c(2900, 3000, 2800), tip_length = 0.03, textsize = 5, vjust = 0
+)
 
-Prophom <- Prophom +
-  theme(legend.position = "none")
-Prophom <- Prophom + annotate("text", x = -Inf, y = Inf, label = "B", hjust = -0.1, vjust = 1.1, size = 15)
+# ==============================================================================
+# SECTION 7: STACKED PANEL ASSEMBLAGE (PATCHWORK syntax)
+# ==============================================================================
+Prophom <- Prophom + theme(legend.position = "none") + annotate("text", x = -Inf, y = Inf, label = "B", hjust = -0.1, vjust = 1.1, size = 15)
 Countdel <- Countdel + annotate("text", x = -Inf, y = Inf, label = "A", hjust = -0.1, vjust = 1.1, size = 15)
+
+# The "/" slash stacks Countdel (Panel A) directly above Prophom (Panel B)
 combined_plot <- Countdel / Prophom
 combined_plot
 
-#using the models to account for coverage
+# ==============================================================================
+# SECTION 8: COV-ADJUSTED PREDICTION VISUALIZATIONS
+# ==============================================================================
+# This final segment builds alternative variations of plots A & B. 
+# Instead of charting raw data values, it extracts the model predictions. 
+# This isolates the biological treatment signals by computationally holding sequencing coverage constant.
 
-# Generate predicted values (on the log scale)
+# Extract scale-corrected count projections
 model_count_predict <- predict(model_count, newdata = merged_snps)
-# Exponentiate to get back to the original scale (SNP counts)
-model_count_predict <- exp(model_count_predict)
-# Add predicted values to data frame
+model_count_predict <- exp(model_count_predict) # Converts back from log-link scale to absolute SNP count scale
+
 merged_snps_p <- merged_snps %>%
   mutate(Predicted_transformed = model_count_predict)
 
+# Plot Coverage-Adjusted Count Metrics
 Countdel_p <- merged_snps_p %>%
-  ggplot(aes(y = Predicted_transformed, x = Treatment, fill = Treatment))+
-  geom_boxplot(alpha=0.8, outlier.shape=NA) +
-  scale_x_discrete(labels=c("KSS"="Outbred Stock","ISO"="Inbred Stock","Control"="No Rescue",
-                            "Inbred"="Inbred Rescue",
-                            "Outbred"="Outbred Rescue"))+
-  geom_jitter(width=0.1, alpha=0.6,show.legend = FALSE) +
-  scale_fill_manual(values=selected_colours1,
-                    labels = c("Outbred Stock", "Inbred Stock", "No Rescue",
-                               "Inbred Rescue", 
-                               "Outbred Rescue"))+
-  geom_vline(xintercept = 2.5,linetype="dashed")+
-  theme_classic()+
-  xlab("Treatment")+
-  ylab("Count of deleterious SNPs")+
-  theme(
-    plot.title = ggtext::element_markdown(face = "bold", size = 20),  # Apply markdown only to title
-    axis.title.x = element_text(face = "bold", size = 20),
-    axis.title.y = element_text(face = "bold", size = 20),            # Keep element_text for y-axis title
-    axis.text.x = element_text(face="bold",size = 16),
-    axis.text.y = element_text(face="bold",size=20),
-    legend.title = element_text(face = "bold", size = 20),
-    legend.text = element_text(face ="bold",size = 20),
-    legend.key.size = unit(1,"cm"),
-    legend.position = "right"
-  )+
-  ggplot2::annotate(geom = "text",x=1.5,y=3200,label="Stock",color="black",size=8)+
-  ggplot2::annotate(geom = "text",x=4.5,y=3200,label="Experimental",color="black",size=8)
+  ggplot(aes(y = Predicted_transformed, x = Treatment, fill = Treatment)) +
+  geom_boxplot(alpha = 0.8, outlier.shape = NA) +
+  scale_x_discrete(labels = c("KSS" = "Outbred Stock", "ISO" = "Inbred Stock", "Control" = "No Rescue", "Inbred" = "Inbred Rescue", "Outbred" = "Outbred Rescue")) +
+  geom_jitter(width = 0.1, alpha = 0.6, show.legend = FALSE) +
+  scale_fill_manual(values = selected_colours1) +
+  geom_vline(xintercept = 2.5, linetype = "dashed") + theme_classic() +
+  xlab("Treatment") + ylab("Count of deleterious SNPs") +
+  ggplot2::annotate(geom = "text", x = 1.5, y = 3200, label = "Stock", color = "black", size = 8) +
+  ggplot2::annotate(geom = "text", x = 4.5, y = 3200, label = "Experimental", color = "black", size = 8) +
+  geom_signif(comparisons = list(c("Outbred", "Inbred"), c("Outbred", "Control"), c("Control", "Inbred")), annotations = c("p < 0.001", "p < 0.001", "N.S"), y_position = c(2900, 3000, 2800), tip_length = 0.03, textsize = 5, vjust = 0)
 
-Countdel_p<-Countdel_p + geom_signif(
-  comparisons = list(c("Outbred", "Inbred"), c("Outbred", "Control"),c("Control","Inbred")), 
-  annotations = c("p < 0.001","p < 0.001","N.S"), 
-  y_position = c(2900, 3000, 2800), 
-  tip_length = 0.03,
-  textsize = 5,
-  vjust = 0
-) 
-
+# Extract scale-corrected proportion projections
 merged_snps_p <- merged_snps_p %>%
-  mutate(adj_prop = predict(model_beta2, type = "response"))
+  mutate(adj_prop = predict(model_beta2, type = "response")) # Converts back from logit link to clear probability scale
 
+# Plot Coverage-Adjusted Proportion Metrics
 Prophom_p <- merged_snps_p %>%
-  ggplot(aes(y = adj_prop, x = Treatment, fill = Treatment))+
-  geom_boxplot(alpha=0.8, outlier.shape=NA) +
-  scale_x_discrete(labels=c("KSS"="Outbred Stock","ISO"="Inbred Stock","Control"="No Rescue",
-                            "Inbred"="Inbred Rescue",
-                            "Outbred"="Outbred Rescue"))+
-  geom_jitter(width=0.1, alpha=0.6,show.legend = FALSE) +
-  scale_fill_manual(values=selected_colours1,
-                    labels = c("Outbred Stock", "Inbred Stock", "No Rescue",
-                               "Inbred Rescue", 
-                               "Outbred Rescue"))+
-  geom_vline(xintercept = 2.5,linetype="dashed")+
-  theme_classic()+
-  xlab("Treatment")+
-  ylab("Proportion of homozygous deleterious SNPs")+
-  theme(
-    plot.title = ggtext::element_markdown(face = "bold", size = 20),  # Apply markdown only to title
-    axis.title.x = element_text(face = "bold", size = 20),
-    axis.title.y = element_text(face = "bold", size = 20),            # Keep element_text for y-axis title
-    axis.text.x = element_text(face="bold",size = 16),
-    axis.text.y = element_text(face="bold",size=20),
-    legend.title = element_text(face = "bold", size = 20),
-    legend.text = element_text(face ="bold",size = 20),
-    legend.key.size = unit(1,"cm"),
-    legend.position = "right"
-  )+
-  ggplot2::annotate(geom = "text",x=1.5,y=0.75,label="Stock",color="black",size=8)+
-  ggplot2::annotate(geom = "text",x=4.5,y=0.75,label="Experimental",color="black",size=8)
+  ggplot(aes(y = adj_prop, x = Treatment, fill = Treatment)) +
+  geom_boxplot(alpha = 0.8, outlier.shape = NA) +
+  scale_x_discrete(labels = c("KSS" = "Outbred Stock", "ISO" = "Inbred Stock", "Control" = "No Rescue", "Inbred" = "Inbred Rescue", "Outbred" = "Outbred Rescue")) +
+  geom_jitter(width = 0.1, alpha = 0.6, show.legend = FALSE) +
+  scale_fill_manual(values = selected_colours1) +
+  geom_vline(xintercept = 2.5, linetype = "dashed") + theme_classic() +
+  xlab("Treatment") + ylab("Proportion of homozygous deleterious SNPs") +
+  ggplot2::annotate(geom = "text", x = 1.5, y = 0.75, label = "Stock", color = "black", size = 8) +
+  ggplot2::annotate(geom = "text", x = 4.5, y = 0.75, label = "Experimental", color = "black", size = 8) +
+  geom_signif(comparisons = list(c("Outbred", "Inbred"), c("Outbred", "Control"), c("Control", "Inbred")), annotations = c("p < 0.001", "p < 0.001", "N.S"), y_position = c(0.24, 0.2, 0.35), tip_length = -0.03, textsize = 5, vjust = 0.5)
 
-Prophom_p<-Prophom_p + geom_signif(
-  comparisons = list(c("Outbred", "Inbred"), c("Outbred", "Control"),c("Control","Inbred")),
-  annotations = c("p < 0.001","p < 0.001", "N.S"),
-  y_position = c(0.24, 0.2, 0.35), 
-  tip_length = -0.03,
-  textsize = 5,
-  vjust = 0.5
-) 
-
-Prophom_p <- Prophom_p +
-  theme(legend.position = "none")
-Prophom_p <- Prophom_p + annotate("text", x = -Inf, y = Inf, label = "B", hjust = -0.1, vjust = 1.1, size = 15)
+# Render unified panel plot containing the adjusted modeling data profiles
+Prophom_p <- Prophom_p + theme(legend.position = "none") + annotate("text", x = -Inf, y = Inf, label = "B", hjust = -0.1, vjust = 1.1, size = 15)
 Countdel_p <- Countdel_p + annotate("text", x = -Inf, y = Inf, label = "A", hjust = -0.1, vjust = 1.1, size = 15)
 combined_plot_p <- Countdel_p / Prophom_p
 combined_plot_p
