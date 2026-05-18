@@ -6,10 +6,10 @@ This repository contains the data and custom scripts required to replicate the a
 IVO/
 ├── Data/
 │   ├── IvO.csv                       # CSV file containing productivity values from experiment
-│   ├── bcftools_Tribolium_castaneum...# VCF/BCF processing output for T. castaneum
+│   ├── bcftools_Tribolium_castaneum.Tcas5.2.dna_sm.toplevel__genetic_rescue__20230926.SNPs_vcftools.het # Heterozygosity statistics for T. castaneum SNPs from the genetic rescue analysis.
 │   ├── gr_tcas.eigenval              # Eigenvalues from PCA analysis
 │   ├── gr_tcas.eigenvec              # Eigenvectors from PCA analysis
-│   ├── psc_output_confident.txt      # [Describe output data/metrics]
+│   ├── psc_output_confident.txt      # SNP statistics summary file of confident SIFT annotationed SNPs
 │   └── psc_snps_stats.txt            # SNP statistics summary file
 ├── Scripts/
 │   ├── Fig 1B.R                      # R script to generate Figure 1B
